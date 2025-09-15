@@ -1,0 +1,32 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Build
+dist/
+build/
+
+# Tests & Coverage
+coverage/
+.nyc_output/
+
+# Lokale Konfiguration / Secrets
+config.mjs
+.env
+.env.local
+.env.*.local
+
+# Sonstiges
+*.log
+*.tmp
