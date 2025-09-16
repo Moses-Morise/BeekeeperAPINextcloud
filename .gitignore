@@ -1,3 +1,4 @@
+# ---------------------------------
 # Node / npm
 node_modules/
 npm-debug.log*
@@ -5,28 +6,44 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# ---------------------------------
 # Betriebssystem
 .DS_Store
 Thumbs.db
 
+# ---------------------------------
 # Editor / IDE
 .vscode/
 .idea/
 
-# Build
+# ---------------------------------
+# Build / Output
 dist/
 build/
 
+# ---------------------------------
 # Tests & Coverage
 coverage/
 .nyc_output/
 
+# ---------------------------------
 # Lokale Konfiguration / Secrets
-config.mjs
+config.mjs     # enthält echte Tokens
 .env
 .env.local
 .env.*.local
 
-# Sonstiges
+# ---------------------------------
+# Logs / temporäre Dateien
 *.log
 *.tmp
+
+
+
+# ---------------------------------
+#lockfile
+package-lock.json
+######################
+
+folderUploadFiles/
+config.mjs
