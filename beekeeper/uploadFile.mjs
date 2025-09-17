@@ -1,10 +1,19 @@
+/**
+ * Upload a local file to a specific folder in Beekeeper’s Document Library.
+ * Steps:
+ *   1. Request upload token from Beekeeper
+ *   2. Upload file to cloud storage (GCS/S3)
+ *   3. Register upload with Beekeeper
+ *   4. Create artifact in target folder
+ */
+
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
 import FormData from "form-data";
-import { TOKEN, TENANT_URL, TARGET_FOLDER_ID } from "./config.mjs";
+import { TOKEN, TENANT_URL, TARGET_FOLDER_ID } from "../config/config.mjs";
 
-// MIME-Mapping
+// Map common file extensions to MIME types
 const EXT_TO_MIME = {
   ".txt": "text/plain",
   ".pdf": "application/pdf",
@@ -21,26 +30,27 @@ const EXT_TO_MIME = {
   ".csv": "text/csv",
 };
 
+// Guess MIME type by file extension
 function guessMime(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   return EXT_TO_MIME[ext] || "application/octet-stream";
 }
 
 /**
- * Lädt eine Datei in die Beekeeper-Dokumentenbibliothek (Zielordner TARGET_FOLDER_ID).
- * - filePath: absoluter/relativer Pfad zur lokalen Datei
- * - overrideName: optionaler Name, wie die Datei in Beekeeper heißen soll (Standard: lokaler Dateiname)
+ * Upload one file to Beekeeper Document Library.
+ * @param {string} filePath  – local path to file
+ * @param {string} overrideName – optional new name in Beekeeper
  */
 export async function uploadFile(filePath, overrideName) {
   if (!fs.existsSync(filePath)) {
-    throw new Error(`Datei nicht gefunden: ${filePath}`);
+    throw new Error(`File not found: ${filePath}`);
   }
 
   const stats = fs.statSync(filePath);
   const fileName = overrideName || path.basename(filePath);
   const mimeType = guessMime(filePath);
 
-  // Schritt 1: Upload-Token für usage_type "file" (Dokumentenbibliothek)
+  // 1️⃣ Get upload token for Document Library
   const tokenRes = await fetch(`${TENANT_URL}/api/2/files/file/upload/token`, {
     method: "GET",
     headers: {
@@ -48,31 +58,22 @@ export async function uploadFile(filePath, overrideName) {
       "Content-Type": "application/json",
     },
   });
-  if (!tokenRes.ok) {
-    const t = await tokenRes.text();
-    throw new Error(`Upload-Token Fehler (${tokenRes.status}): ${t}`);
-  }
+  if (!tokenRes.ok) throw new Error(`Upload token error (${tokenRes.status}): ${await tokenRes.text()}`);
   const tokenData = await tokenRes.json();
 
-  // Schritt 2: Datei zu Cloud (GCS/S3) hochladen
+  // 2️⃣ Upload file to cloud storage (GCS/S3)
   const formData = new FormData();
   for (const entry of tokenData.additional_form_data) {
     formData.append(entry.name, entry.value);
   }
   formData.append(tokenData.file_param_name || "file", fs.createReadStream(filePath));
 
-  const uploadRes = await fetch(tokenData.upload_url, {
-    method: "POST",
-    body: formData,
-  });
-  if (!uploadRes.ok) {
-    const t = await uploadRes.text();
-    throw new Error(`Cloud-Upload Fehler (${uploadRes.status}): ${t}`);
-  }
+  const uploadRes = await fetch(tokenData.upload_url, { method: "POST", body: formData });
+  if (!uploadRes.ok) throw new Error(`Cloud upload error (${uploadRes.status}): ${await uploadRes.text()}`);
 
-  // Schritt 3: Upload bei Beekeeper registrieren
+  // 3️⃣ Register uploaded file with Beekeeper
   const keyField = tokenData.additional_form_data.find((e) => e.name === "key");
-  if (!keyField?.value) throw new Error("Kein 'key' im Upload-Token gefunden.");
+  if (!keyField?.value) throw new Error("No 'key' found in upload token.");
 
   const registerRes = await fetch(`${TENANT_URL}/api/2/files/file/upload`, {
     method: "POST",
@@ -87,13 +88,10 @@ export async function uploadFile(filePath, overrideName) {
       size: stats.size,
     }),
   });
-  if (!registerRes.ok) {
-    const t = await registerRes.text();
-    throw new Error(`Registrierung Fehler (${registerRes.status}): ${t}`);
-  }
+  if (!registerRes.ok) throw new Error(`Register error (${registerRes.status}): ${await registerRes.text()}`);
   const fileInfo = await registerRes.json();
 
-  // Schritt 4: Datei im Dokumentenordner ablegen
+  // 4️⃣ Create artifact in the target folder
   const artifactRes = await fetch(`${TENANT_URL}/api/2/artifacts/${TARGET_FOLDER_ID}/children`, {
     method: "POST",
     headers: {
@@ -114,12 +112,9 @@ export async function uploadFile(filePath, overrideName) {
       },
     }),
   });
-  if (!artifactRes.ok) {
-    const t = await artifactRes.text();
-    throw new Error(`Artifact-Erstellung Fehler (${artifactRes.status}): ${t}`);
-  }
+  if (!artifactRes.ok) throw new Error(`Artifact creation error (${artifactRes.status}): ${await artifactRes.text()}`);
   const artifact = await artifactRes.json();
 
-  console.log(`Hochgeladen: ${fileName} → Artifact-ID: ${artifact.id ?? "(siehe Antwort)"}`);
+  console.log(`Uploaded: ${fileName} → Artifact ID: ${artifact.id ?? "(check response)"}`);
   return artifact;
 }
