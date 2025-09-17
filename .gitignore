@@ -47,3 +47,4 @@ package-lock.json
 
 folderUploadFiles/
 config.mjs
+config/config.mjs
